@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Agent Researcher</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #080d14;
+      font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', 'Segoe UI', sans-serif;
+      color: #c8d8f0;
+      min-height: 100vh;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at 20% 30%, #0cf2ff0a 0%, transparent 50%),
+                  radial-gradient(ellipse at 80% 70%, #6366f10a 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .header {
+      border-bottom: 1px solid #1a2a3a;
+      padding: 20px 32px;
+      display: flex; align-items: center; gap: 12px;
+      position: sticky; top: 0; background: #080d14; z-index: 10;
+    }
+    .header h1 { font-size: 18px; font-weight: 700; color: #e8f0ff; }
+    .header .badge {
+      font-size: 11px; font-weight: 700; padding: 3px 10px;
+      border-radius: 50px; border: 1px solid #0cf2ff44; color: #0cf2ff;
+      letter-spacing: 0.5px;
+    }
+
+    .main { max-width: 860px; margin: 0 auto; padding: 40px 24px; }
+
+    /* INPUT */
+    .input-section { margin-bottom: 32px; }
+    .input-label { font-size: 13px; color: #4a6080; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 10px; }
+    .input-row { display: flex; gap: 10px; }
+    .topic-input {
+      flex: 1;
+      background: #0e1820;
+      border: 1.5px solid #1a2a3a;
+      border-radius: 14px;
+      padding: 14px 18px;
+      font-size: 16px;
+      color: #e8f0ff;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .topic-input:focus { border-color: #0cf2ff66; }
+    .topic-input::placeholder { color: #2a4060; }
+    .run-btn {
+      background: linear-gradient(135deg, #0a3a5a, #0a2a5a);
+      border: 1.5px solid #0cf2ff66;
+      color: #0cf2ff;
+      padding: 14px 28px;
+      border-radius: 14px;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+      transition: all 0.2s; white-space: nowrap;
+    }
+    .run-btn:hover { border-color: #0cf2ff; box-shadow: 0 4px 20px #0cf2ff22; transform: translateY(-1px); }
+    .run-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .ex-chip {
+      background: #0e1820; border: 1px solid #1a2a3a; border-radius: 50px;
+      padding: 5px 14px; font-size: 13px; color: #4a6080; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ex-chip:hover { border-color: #0cf2ff44; color: #8ab4cc; }
+
+    /* PIPELINE */
+    .pipeline {
+      display: flex; gap: 0; margin-bottom: 28px; position: relative;
+    }
+    .pipeline::before {
+      content: '';
+      position: absolute; top: 24px; left: 40px; right: 40px; height: 2px;
+      background: #1a2a3a; z-index: 0;
+    }
+    .agent-step {
+      flex: 1; text-align: center; position: relative; z-index: 1;
+    }
+    .agent-icon {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: #0e1820; border: 2px solid #1a2a3a;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; margin: 0 auto 8px;
+      transition: all 0.3s;
+    }
+    .agent-name { font-size: 12px; color: #2a4060; font-weight: 700; transition: color 0.3s; }
+    .agent-step.active .agent-icon {
+      border-color: #0cf2ff; background: #0a2a3a;
+      box-shadow: 0 0 16px #0cf2ff44;
+      animation: pulse 1s ease-in-out infinite;
+    }
+    .agent-step.active .agent-name { color: #0cf2ff; }
+    .agent-step.done .agent-icon { border-color: #22d3ee55; background: #0a1e28; }
+    .agent-step.done .agent-name { color: #4a8898; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 16px #0cf2ff44; }
+      50% { box-shadow: 0 0 24px #0cf2ff88; }
+    }
+
+    /* LOGS */
+    .logs-section { margin-bottom: 24px; }
+    .log-item {
+      background: #0a1420;
+      border: 1px solid #1a2a3a;
+      border-left: 3px solid #0cf2ff44;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 14px; color: #6a9abb;
+      margin-bottom: 8px;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    /* REPORT */
+    .report-section { display: none; }
+    .report-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px;
+    }
+    .report-title { font-size: 14px; font-weight: 700; color: #4a6080; letter-spacing: 0.5px; }
+    .copy-btn {
+      background: #0e1820; border: 1px solid #1a2a3a; color: #4a6080;
+      padding: 6px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: all 0.2s;
+    }
+    .copy-btn:hover { border-color: #0cf2ff44; color: #8ab4cc; }
+
+    .report-body {
+      background: #0a1420;
+      border: 1px solid #1a2a3a;
+      border-radius: 16px;
+      padding: 32px;
+      line-height: 1.8;
+    }
+    .report-body h1 { font-size: 22px; color: #e8f0ff; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #1a2a3a; }
+    .report-body h2 { font-size: 17px; color: #0cf2ff; margin: 24px 0 12px; }
+    .report-body h3 { font-size: 15px; color: #8ab4cc; margin: 16px 0 8px; }
+    .report-body p { color: #8aa8cc; margin-bottom: 12px; }
+    .report-body ul, .report-body ol { padding-left: 20px; margin-bottom: 12px; }
+    .report-body li { color: #8aa8cc; margin-bottom: 6px; }
+    .report-body strong { color: #c8d8f0; }
+    .report-body code { background: #0e1820; padding: 2px 8px; border-radius: 4px; font-size: 13px; color: #0cf2ff; }
+    .report-body blockquote { border-left: 3px solid #0cf2ff44; padding-left: 16px; margin: 12px 0; color: #6a9abb; }
+    .report-body hr { border: none; border-top: 1px solid #1a2a3a; margin: 20px 0; }
+
+    .status-msg {
+      text-align: center; padding: 20px;
+      font-size: 14px; color: #2a4060;
+    }
+    .status-msg.error { color: #f87171; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🤖 Multi-Agent Researcher</h1>
+  <span class="badge">LangGraph</span>
+</div>
+
+<div class="main">
+
+  <!-- INPUT -->
+  <div class="input-section">
+    <div class="input-label">RESEARCH TOPIC</div>
+    <div class="input-row">
+      <input class="topic-input" id="topic" placeholder="조사하고 싶은 주제를 입력해봐..." />
+      <button class="run-btn" id="run-btn" onclick="startResearch()">리서치 시작 →</button>
+    </div>
+    <div class="examples">
+      <span class="ex-chip" onclick="setTopic('LangGraph 멀티에이전트 시스템')">LangGraph 멀티에이전트</span>
+      <span class="ex-chip" onclick="setTopic('2025년 AI 트렌드')">2025년 AI 트렌드</span>
+      <span class="ex-chip" onclick="setTopic('RAG vs Fine-tuning 비교')">RAG vs Fine-tuning</span>
+      <span class="ex-chip" onclick="setTopic('한국 AI 스타트업 현황')">한국 AI 스타트업</span>
+      <span class="ex-chip" onclick="setTopic('ChatGPT 최신 업데이트')">ChatGPT 업데이트</span>
+    </div>
+  </div>
+
+  <!-- PIPELINE -->
+  <div class="pipeline" id="pipeline">
+    <div class="agent-step" id="step-planner">
+      <div class="agent-icon">🎯</div>
+      <div class="agent-name">플래너</div>
+    </div>
+    <div class="agent-step" id="step-researcher">
+      <div class="agent-icon">🔍</div>
+      <div class="agent-name">리서처</div>
+    </div>
+    <div class="agent-step" id="step-analyst">
+      <div class="agent-icon">🧠</div>
+      <div class="agent-name">분석가</div>
+    </div>
+    <div class="agent-step" id="step-writer">
+      <div class="agent-icon">✍️</div>
+      <div class="agent-name">작성가</div>
+    </div>
+  </div>
+
+  <!-- STATUS -->
+  <div class="status-msg" id="status">주제를 입력하고 리서치를 시작해봐.</div>
+
+  <!-- LOGS -->
+  <div class="logs-section" id="logs"></div>
+
+  <!-- REPORT -->
+  <div class="report-section" id="report-section">
+    <div class="report-header">
+      <div class="report-title">📄 RESEARCH REPORT</div>
+      <button class="copy-btn" onclick="copyReport()">복사하기</button>
+    </div>
+    <div class="report-body" id="report-body"></div>
+  </div>
+
+</div>
+
+<script>
+  const nodeMap = { planner: 'step-planner', researcher: 'step-researcher', analyst: 'step-analyst', writer: 'step-writer' };
+  let reportRaw = '';
+
+  function setTopic(t) {
+    document.getElementById('topic').value = t;
+  }
+
+  function setStep(node, state) {
+    const el = document.getElementById(nodeMap[node]);
+    if (el) { el.className = 'agent-step ' + state; }
+  }
+
+  function addLog(msg) {
+    const div = document.createElement('div');
+    div.className = 'log-item';
+    div.innerHTML = msg;
+    document.getElementById('logs').appendChild(div);
+  }
+
+  function resetUI() {
+    Object.keys(nodeMap).forEach(n => setStep(n, ''));
+    document.getElementById('logs').innerHTML = '';
+    document.getElementById('report-section').style.display = 'none';
+    document.getElementById('report-body').innerHTML = '';
+    reportRaw = '';
+  }
+
+  async function startResearch() {
+    const topic = document.getElementById('topic').value.trim();
+    if (!topic) return;
+
+    resetUI();
+    document.getElementById('run-btn').disabled = true;
+    document.getElementById('status').textContent = '에이전트들이 작동 중이에요...';
+    document.getElementById('status').className = 'status-msg';
+
+    const es = new EventSource('/research?' + new URLSearchParams());
+
+    const resp = await fetch('/research', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic }),
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          handleEvent(data);
+        } catch {}
+      }
+    }
+  }
+
+  function handleEvent(data) {
+    switch (data.type) {
+      case 'start':
+        document.getElementById('status').textContent = data.message;
+        setStep('planner', 'active');
+        break;
+
+      case 'log':
+        // 이전 노드 done, 현재 노드 active
+        const order = ['planner', 'researcher', 'analyst', 'writer'];
+        const idx = order.indexOf(data.node);
+        if (idx > 0) setStep(order[idx - 1], 'done');
+        setStep(data.node, 'active');
+        addLog(data.message);
+        break;
+
+      case 'report':
+        reportRaw = data.content;
+        Object.keys(nodeMap).forEach(n => setStep(n, 'done'));
+        document.getElementById('report-section').style.display = 'block';
+        document.getElementById('report-body').innerHTML = marked.parse(data.content);
+        document.getElementById('status').textContent = '✅ 리서치 완료!';
+        break;
+
+      case 'error':
+        document.getElementById('status').textContent = '❌ ' + data.message;
+        document.getElementById('status').className = 'status-msg error';
+        break;
+
+      case 'done':
+        document.getElementById('run-btn').disabled = false;
+        break;
+    }
+  }
+
+  function copyReport() {
+    navigator.clipboard.writeText(reportRaw).then(() => {
+      const btn = document.querySelector('.copy-btn');
+      btn.textContent = '복사됨!';
+      setTimeout(() => btn.textContent = '복사하기', 2000);
+    });
+  }
+
+  document.getElementById('topic').addEventListener('keydown', e => {
+    if (e.key === 'Enter') startResearch();
+  });
+</script>
+</body>
+</html>
