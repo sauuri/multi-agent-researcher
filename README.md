@@ -6,7 +6,7 @@
 
 ## 📸 Demo
 
-![demo](https://github.com/user-attachments/assets/placeholder)
+![demo](demo.gif)
 
 ## 🏗️ 아키텍처
 
@@ -15,7 +15,7 @@
     ↓
 🎯 Planner    → 최적 검색 쿼리 3개 자동 생성
     ↓
-🔍 Researcher → DuckDuckGo 웹 검색 + 결과 수집
+🔍 Researcher → Tavily 웹 검색 + 결과 수집
     ↓
 🧠 Analyst    → 핵심 인사이트 추출 및 분석
     ↓
@@ -31,7 +31,7 @@
 |------|------|
 | Agent Orchestration | LangGraph |
 | LLM | OpenAI GPT-4o-mini |
-| Search | DuckDuckGo Search |
+| Search | Tavily Search API |
 | Backend | FastAPI + SSE Streaming |
 | Frontend | Vanilla JS (마크다운 렌더링) |
 
